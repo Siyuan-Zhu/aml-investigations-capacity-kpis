@@ -38,14 +38,16 @@ def kpi_panel(m: pd.DataFrame) -> None:
     a.set_title("Alert volume per month"); a.legend(frameon=False)
     a = axs[0, 1]
     a.plot(x, m["backlog_eom"], color=BLUE)
-    for t, c in [(1500, ORANGE), (2500, RED)]:
+    amber, red = C.threshold("backlog_eom")
+    for t, c in [(amber, ORANGE), (red, RED)]:
         a.axhline(t, color=c, ls=":", lw=1.2)
-    a.text(x.iloc[0], 1560, "amber 1,500", color=ORANGE, fontsize=8)
-    a.text(x.iloc[0], 2560, "red 2,500", color=RED, fontsize=8)
+    a.text(x.iloc[0], amber + 60, f"amber {amber:,}", color=ORANGE, fontsize=8)
+    a.text(x.iloc[0], red + 60, f"red {red:,}", color=RED, fontsize=8)
     a.set_title("Open backlog at month end")
     a = axs[0, 2]
     a.plot(x, m["pct_within_sla"] * 100, color=BLUE)
-    for t, c in [(95, ORANGE), (90, RED)]:
+    amber, red = C.threshold("pct_within_sla")
+    for t, c in [(amber * 100, ORANGE), (red * 100, RED)]:
         a.axhline(t, color=c, ls=":", lw=1.2)
     a.set_ylim(0, 105); a.set_title("% closed within SLA")
     a = axs[1, 0]
@@ -56,12 +58,12 @@ def kpi_panel(m: pd.DataFrame) -> None:
     a.plot(x, m["sar_conversion_rate"] * 100, color=GREEN, label="SAR conversion (closed cases)")
     a.set_title("Escalation and SAR conversion (%)"); a.legend(frameon=False, fontsize=8)
     a = axs[1, 2]
-    a.plot(x, m["cases_per_inv_week"], color=BLUE, label="Cases / investigator / week")
-    a.set_title("Cases opened per investigator per week")
+    a.plot(x, m["alerts_closed_per_inv_week"], color=BLUE)
+    a.set_title("Alerts closed per investigator per week")
     for a in axs.flat:
         _fmt(a); _launch(a)
     axs[0, 0].text(shock_start_month(), axs[0, 0].get_ylim()[0], " rule launch", color=GREY, fontsize=8, va="bottom")
-    fig.suptitle("AML alert operations: KPI/KRI trends, Jan 2024 to Jun 2026", fontweight="bold", y=0.995)
+    fig.suptitle("KPI/KRI trends, Jan 2024 to Jun 2026", fontweight="bold", y=0.995)
     fig.text(0.01, 0.005, NOTE, fontsize=8, color=GREY)
     fig.tight_layout(rect=(0, 0.02, 1, 0.97))
     fig.savefig(C.FIG_DIR / "kpi_trend_panel.png"); plt.close(fig)

@@ -61,3 +61,4 @@ Each business day, each present investigator works alerts until their minutes fo
 - Pre-launch, capacity exceeds demand, so the backlog is near zero and SLA attainment is near 100%. The backlog is driven by the launch plus the staffing dip.
 - No holidays, seasonality in attrition, alert re-opens, quality review or second-level case investigators.
 - Case workload after escalation is not modeled as consuming investigator capacity.
+- Escalated and non-escalated alerts share the same handle-time distribution within a rule.
