@@ -1,4 +1,4 @@
-# AML Alert Operations: KPI/KRI Memo (June 2026)
+# AML Investigations Capacity & KPIs: KPI/KRI Memo (June 2026)
 
 **To:** Head of AML Operations | **From:** Operations Performance & Analytics | **Data:** synthetic, illustrative only (seeded simulation of a 25-investigator alert queue; no real institution's figures or rates)
 

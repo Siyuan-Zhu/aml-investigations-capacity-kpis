@@ -102,7 +102,7 @@ def build() -> str:
     avg_ph = cap["productive_hours_per_fte"].mean()
     fte_per_10pct = 0.10 * monthly_new_hours / avg_ph
 
-    memo = f"""# AML Alert Operations: KPI/KRI Memo ({asof})
+    memo = f"""# AML Investigations Capacity & KPIs: KPI/KRI Memo ({asof})
 
 **To:** Head of AML Operations | **From:** Operations Performance & Analytics | **Data:** synthetic, illustrative only (seeded simulation of a {int(m['headcount_mid'].iloc[0])}-investigator alert queue; no real institution's figures or rates)
 

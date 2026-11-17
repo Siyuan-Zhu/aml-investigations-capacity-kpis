@@ -1,4 +1,4 @@
-# AML Alert Operations Analytics
+# AML Investigations Capacity & KPIs
 
 KPI and KRI reporting, volume forecasting and investigator capacity planning for an anti-money-laundering (AML) alert queue.
 
