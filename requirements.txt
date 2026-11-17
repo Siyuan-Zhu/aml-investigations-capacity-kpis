@@ -1,6 +1,6 @@
-numpy
-pandas
-duckdb
-statsmodels
-matplotlib
-pytest
+numpy==2.5.2
+pandas==3.0.5
+duckdb==2.0.0
+statsmodels==0.15.0
+matplotlib==3.11.2
+pytest==9.2.0
