@@ -51,6 +51,10 @@ def run(monthly: pd.DataFrame) -> dict:
     bt_pred = fit_bt.predict(X.iloc[n_train:])
     backtest = pd.DataFrame({"actual": s.iloc[n_train:], "predicted": bt_pred})
     bt_mape = mape(backtest["actual"], backtest["predicted"])
+    # Seasonal-naive comparison: each holdout month predicted by the same month a year earlier.
+    naive = s.shift(12).iloc[n_train:]
+    backtest["seasonal_naive"] = naive
+    naive_mape = mape(backtest["actual"], naive)
 
     fit = sm.OLS(s, X).fit()
     fut_idx = pd.date_range(s.index[-1] + pd.DateOffset(months=1), periods=C.FORECAST_MONTHS, freq="MS")
@@ -67,6 +71,7 @@ def run(monthly: pd.DataFrame) -> dict:
     fitted = pd.DataFrame({"month_start": s.index, "actual": s.values, "fitted": fit.fittedvalues.values})
     summary = {
         "backtest_mape": bt_mape,
+        "seasonal_naive_mape": naive_mape,
         "holdout_months": C.HOLDOUT_MONTHS,
         "train_months": n_train,
         "r_squared_full_fit": float(fit.rsquared),
@@ -85,7 +90,8 @@ def main() -> None:
     r["backtest"].reset_index().rename(columns={"index": "month_start"}).to_csv(C.OUT_DIR / "backtest.csv", index=False)
     r["fitted"].to_csv(C.OUT_DIR / "fitted.csv", index=False)
     (C.OUT_DIR / "forecast_summary.json").write_text(json.dumps(r["summary"], indent=2))
-    print(f"Backtest MAPE on last {C.HOLDOUT_MONTHS} months: {r['summary']['backtest_mape']:.1%}")
+    print(f"Backtest MAPE on last {C.HOLDOUT_MONTHS} months: {r['summary']['backtest_mape']:.1%} "
+          f"(seasonal naive {r['summary']['seasonal_naive_mape']:.1%})")
 
 
 if __name__ == "__main__":

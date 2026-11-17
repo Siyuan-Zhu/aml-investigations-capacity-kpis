@@ -10,6 +10,7 @@ closed AS (
         CAST(date_trunc('month', closed_date) AS DATE)                           AS month_start,
         COUNT(*)                                                                 AS alerts_closed,
         AVG(handle_minutes)                                                      AS aht_min,
+        AVG(date_diff('day', created_date, closed_date))                         AS avg_age_at_close_days,
         AVG(CASE WHEN breached_at_close THEN 0.0 ELSE 1.0 END)                   AS pct_within_sla,
         AVG(CASE WHEN breached_at_close THEN 1.0 ELSE 0.0 END)                   AS sla_breach_rate,
         AVG(CASE WHEN disposition = 'escalated_to_case' THEN 1.0 ELSE 0.0 END)   AS escalation_rate,
@@ -35,10 +36,26 @@ open_snap AS (
         COUNT(*) FILTER (WHERE date_diff('day', a.created_date, m.month_end) > 60)           AS open_gt60,
         COUNT(*) FILTER (WHERE m.month_end > a.sla_due_date)                                 AS overdue_open,
         COUNT(*) FILTER (WHERE m.month_end > a.sla_due_date AND a.risk_band = 'High')        AS high_overdue_open,
-        COUNT(*) FILTER (WHERE a.risk_band = 'High')                                         AS high_open
+        COUNT(*) FILTER (WHERE a.risk_band = 'High')                                         AS high_open,
+        MEDIAN(date_diff('day', a.created_date, m.month_end))                                AS median_age_open,
+        MEDIAN(date_diff('day', a.created_date, m.month_end)) FILTER (WHERE a.risk_band = 'High') AS median_age_open_high,
+        MEDIAN(date_diff('day', a.created_date, m.month_end)) FILTER (WHERE a.risk_band = 'Low')  AS median_age_open_low
     FROM dim_month m
     LEFT JOIN stg_alerts a
       ON a.created_date <= m.month_end AND (a.closed_date IS NULL OR a.closed_date > m.month_end)
+    GROUP BY 1
+),
+-- Cases open at month end and how many are more than sar_clock_days calendar days
+-- from alert detection (alert creation) without a decision (SAR-timeliness KRI).
+case_snap AS (
+    SELECT
+        m.month_start,
+        COUNT(c.case_id)                                                                       AS open_cases,
+        COUNT(*) FILTER (WHERE date_diff('day', a.created_date, m.month_end) > (SELECT sar_clock_days FROM run_params)) AS sar_clock_overdue
+    FROM dim_month m
+    LEFT JOIN stg_cases c
+      ON c.opened_date <= m.month_end AND (c.closed_date IS NULL OR c.closed_date > m.month_end)
+    LEFT JOIN stg_alerts a ON a.alert_id = c.alert_id
     GROUP BY 1
 ),
 staff AS (
@@ -57,6 +74,12 @@ SELECT
     o.overdue_open,
     o.high_overdue_open,
     o.high_open,
+    o.median_age_open,
+    o.median_age_open_high,
+    o.median_age_open_low,
+    cs.open_cases,
+    cs.sar_clock_overdue,
+    cl.avg_age_at_close_days,
     cl.pct_within_sla,
     cl.sla_breach_rate,
     cl.aht_min,
@@ -73,12 +96,14 @@ SELECT
     CASE WHEN o.backlog_eom > 0 THEN o.open_gt30 * 1.0 / o.backlog_eom END       AS open_gt30_pct,
     CASE WHEN o.backlog_eom > 0 THEN o.open_gt60 * 1.0 / o.backlog_eom END       AS open_gt60_pct,
     CASE WHEN o.overdue_open > 0 THEN o.high_overdue_open * 1.0 / o.overdue_open END AS high_overdue_share,
-    CASE WHEN o.high_open > 0 THEN o.high_overdue_open * 1.0 / o.high_open END       AS high_overdue_pct
+    CASE WHEN o.high_open > 0 THEN o.high_overdue_open * 1.0 / o.high_open END       AS high_overdue_pct,
+    CASE WHEN cs.open_cases > 0 THEN cs.sar_clock_overdue * 1.0 / cs.open_cases END  AS sar_clock_overdue_pct
 FROM dim_month m
 LEFT JOIN created c       USING (month_start)
 LEFT JOIN closed cl       USING (month_start)
 LEFT JOIN cases_opened co USING (month_start)
 LEFT JOIN cases_closed cc USING (month_start)
 LEFT JOIN open_snap o     USING (month_start)
+LEFT JOIN case_snap cs    USING (month_start)
 LEFT JOIN staff s         USING (month_start)
 ORDER BY m.month_start;

@@ -88,15 +88,30 @@ THRESHOLDS = [
     ("backlog_eom",          "Open alert backlog (month end)",        "KRI", "alerts", "higher_is_worse",  1500,  2500),
     ("pct_within_sla",       "% closed within SLA",                   "KPI", "pct",    "higher_is_better", 0.95,  0.90),
     ("aht_min",              "Average handle time",                   "KPI", "min",    "monitor",          None,  None),
-    ("cases_per_inv_week",   "Cases opened per investigator per week","KPI", "cases",  "monitor",          None,  None),
+    ("alerts_closed_per_inv_week", "Alerts closed per investigator per week", "KPI", "per_week", "monitor", None,  None),
     ("escalation_rate",      "Escalation rate",                       "KPI", "pct",    "monitor",          None,  None),
     ("sar_conversion_rate",  "SAR conversion rate (closed cases)",    "KPI", "pct",    "monitor",          None,  None),
-    ("fp_rate",              "False-positive rate",                   "KPI", "pct",    "monitor",          None,  None),
-    ("sla_breach_rate",      "SLA breach rate (closed alerts)",       "KRI", "pct",    "higher_is_worse",  0.05,  0.10),
+    ("fp_rate",              "False-positive rate (complement of escalation rate)", "KPI", "pct",    "monitor",          None,  None),
+    ("sla_breach_rate",      "SLA breach rate (complement of % within SLA)", "KRI", "pct",    "higher_is_worse",  0.05,  0.10),
     ("open_gt30_pct",        "Open alerts aged > 30 days (% of open)","KRI", "pct",    "higher_is_worse",  0.05,  0.10),
     ("open_gt60_pct",        "Open alerts aged > 60 days (% of open)","KRI", "pct",    "higher_is_worse",  0.02,  0.05),
     ("high_overdue_pct",     "High-risk open alerts past SLA (% of High-risk open)", "KRI", "pct", "higher_is_worse", 0.10, 0.25),
+    # Placeholder thresholds, not a regulatory limit.
+    ("sar_clock_overdue_pct", "Open cases >30 days from alert detection (% of open cases)", "KRI", "pct", "higher_is_worse", 0.10, 0.25),
 ]
+
+# Calendar days from alert detection after which an open case counts toward the
+# SAR-timeliness KRI. Mirrors the US 30-day filing window (31 CFR 1020.320(b)(3));
+# the thresholds above are placeholders.
+SAR_CLOCK_DAYS = 30
+
+def threshold(metric_id: str) -> tuple[float | None, float | None]:
+    """(amber, red) for a metric id."""
+    for t in THRESHOLDS:
+        if t[0] == metric_id:
+            return t[5], t[6]
+    raise KeyError(metric_id)
+
 
 # ---- Forecast / capacity --------------------------------------------------
 HOLDOUT_MONTHS = 6

@@ -7,9 +7,9 @@ WITH long AS (
                CAST(alerts_created AS DOUBLE) AS alerts_created,
                CAST(alerts_closed AS DOUBLE) AS alerts_closed,
                CAST(backlog_eom AS DOUBLE) AS backlog_eom,
-               pct_within_sla, aht_min, cases_per_inv_week, escalation_rate,
+               pct_within_sla, aht_min, alerts_closed_per_inv_week, escalation_rate,
                sar_conversion_rate, fp_rate, sla_breach_rate,
-               open_gt30_pct, open_gt60_pct, high_overdue_pct
+               open_gt30_pct, open_gt60_pct, high_overdue_pct, sar_clock_overdue_pct
         FROM mart_monthly
     )
     ON COLUMNS(* EXCLUDE month_start)

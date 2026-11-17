@@ -85,6 +85,7 @@ def test_investigator_productivity_and_ramp(con):
     assert f["headcount_mid"] == 2
     assert f["effective_fte"] == pytest.approx(1.0 + 0.6)  # INV-B tenure 1 month
     assert f["cases_per_inv_week"] == pytest.approx(1 / 2 / (20 / 5))
+    assert f["alerts_closed_per_inv_week"] == pytest.approx(2 / 2 / (20 / 5))
     j = monthly(con, date(2026, 1, 1))
     assert j["effective_fte"] == pytest.approx(1.0 + 0.4)
 
@@ -111,3 +112,56 @@ def test_scorecard_rag(con):
     assert sc.loc["high_overdue_pct", "rag"] == "Red"       # 100% >= 25%
     assert sc.loc["alerts_created", "rag"] == "Monitor"
     assert sc.loc["backlog_eom", "prior_value"] == 1
+
+
+@pytest.fixture(scope="module")
+def edge_con():
+    """Boundary dates, as of 2026-03-31."""
+    rows = [
+        # closed on the SLA due date (created 03-02 + 5 days = 03-07): within SLA
+        ("E1", "2026-03-02 02:00", "S1", "High", 80, 5, 30.0, "INV-A", "2026-03-07 15:00", "closed_no_action"),
+        # closed one day after the due date: breached
+        ("E2", "2026-03-02 02:00", "S1", "High", 80, 5, 30.0, "INV-A", "2026-03-08 15:00", "closed_no_action"),
+        # closed on month end: not in March's end-of-month backlog
+        ("E3", "2026-03-20 02:00", "S1", "Low", 10, 20, 30.0, "INV-A", "2026-03-31 10:00", "closed_no_action"),
+        # still open at month end
+        ("E4", "2026-03-30 02:00", "S1", "Low", 10, 20, None, None, None, None),
+        # escalated; case still open. Created 02-28 (31 days before 03-31) and 03-01 (30 days)
+        ("E5", "2026-02-28 02:00", "S1", "Low", 10, 20, 30.0, "INV-A", "2026-03-03 10:00", "escalated_to_case"),
+        ("E6", "2026-03-01 02:00", "S1", "Low", 10, 20, 30.0, "INV-A", "2026-03-03 10:00", "escalated_to_case"),
+    ]
+    alerts = pd.DataFrame(rows, columns=["alert_id", "created_at", "scenario", "risk_band", "risk_score", "sla_days",
+                                         "handle_minutes", "assigned_investigator_id", "closed_at", "disposition"])
+    alerts["created_at"] = pd.to_datetime(alerts["created_at"])
+    alerts["closed_at"] = pd.to_datetime(alerts["closed_at"])
+    cases = pd.DataFrame(
+        [("C1", "E5", "2026-03-03 10:00", None, "INV-A", None), ("C2", "E6", "2026-03-03 10:00", None, "INV-A", None)],
+        columns=["case_id", "alert_id", "opened_at", "closed_at", "investigator_id", "sar_filed"],
+    )
+    cases["opened_at"] = pd.to_datetime(cases["opened_at"])
+    cases["closed_at"] = pd.to_datetime(cases["closed_at"])
+    cases["sar_filed"] = cases["sar_filed"].astype("boolean")
+    inv = pd.DataFrame({"investigator_id": ["INV-A"], "hire_date": pd.to_datetime(["2025-01-01"]),
+                        "term_date": pd.to_datetime([None])})
+    c = duckdb.connect()
+    build_models(c, {"alerts": alerts, "cases": cases, "investigators": inv}, date(2026, 3, 31))
+    return c
+
+
+def test_alert_closed_on_sla_due_date_is_within_sla(edge_con):
+    df = edge_con.execute("SELECT alert_id, breached_at_close FROM stg_alerts WHERE alert_id IN ('E1', 'E2')").df()
+    got = dict(zip(df["alert_id"], df["breached_at_close"]))
+    assert got == {"E1": False, "E2": True}
+
+
+def test_alert_closed_on_month_end_not_in_backlog(edge_con):
+    mar = edge_con.execute("SELECT * FROM mart_monthly WHERE month_start = DATE '2026-03-01'").df().iloc[0]
+    # open at 03-31: E4 only (E3 closed on 03-31; E1, E2, E5, E6 closed earlier)
+    assert mar["backlog_eom"] == 1
+
+
+def test_sar_clock_boundary(edge_con):
+    mar = edge_con.execute("SELECT * FROM mart_monthly WHERE month_start = DATE '2026-03-01'").df().iloc[0]
+    assert mar["open_cases"] == 2
+    assert mar["sar_clock_overdue"] == 1  # 31 days counts; exactly 30 days does not
+    assert mar["sar_clock_overdue_pct"] == pytest.approx(0.5)

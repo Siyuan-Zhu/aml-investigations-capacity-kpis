@@ -16,6 +16,7 @@ SELECT
     scenario,
     COUNT(*)                                                                      AS alerts_closed,
     AVG(handle_minutes)                                                           AS aht_min,
+    COUNT(*) FILTER (WHERE case_closed)                                           AS cases_closed,
     AVG(CASE WHEN disposition = 'closed_no_action' THEN 1.0 ELSE 0.0 END)         AS fp_rate,
     AVG(CASE WHEN disposition = 'escalated_to_case' THEN 1.0 ELSE 0.0 END)        AS escalation_rate,
     CASE WHEN COUNT(*) FILTER (WHERE case_closed) > 0

@@ -95,7 +95,7 @@ def _build_roster(rng: np.random.Generator, end: date) -> pd.DataFrame:
                 leavers.append(r)
         for r in leavers:
             r["term_date"] = d
-            # backfill only for random attrition and cluster leavers alike
+            # backfill every departure
             lag = int(rng.integers(C.BACKFILL_LAG_DAYS[0], C.BACKFILL_LAG_DAYS[1] + 1))
             pending_hires.append(d + timedelta(days=lag))
     return pd.DataFrame(rows)
@@ -161,8 +161,7 @@ def simulate(seed: int = C.SEED) -> dict[str, pd.DataFrame]:
     heap: list[tuple[int, int]] = []   # (band rank, alert index); index order = creation order
     fifo: list[tuple[int, int]] = []
     carry = {i: 0.0 for i in roster["investigator_id"]}
-    n_open = [0]
-    C_FIFO = FIFO_PICK_PROB
+    n_open = 0
     hire = dict(zip(roster["investigator_id"], roster["hire_date"]))
     term = dict(zip(roster["investigator_id"], roster["term_date"]))
     for d in business_days(C.START_DATE, end):
@@ -170,7 +169,7 @@ def simulate(seed: int = C.SEED) -> dict[str, pd.DataFrame]:
             rank = 2 if (band[i] != "Low" and misroute[i]) else BAND_RANK[band[i]]
             heapq.heappush(heap, (rank, i))
             heapq.heappush(fifo, (i, i))
-            n_open[0] += 1
+            n_open += 1
         active = [k for k in hire if hire[k] <= d and (term[k] is None or term[k] > d)]
         order = rng.permutation(len(active))
         for oi in order:
@@ -179,12 +178,12 @@ def simulate(seed: int = C.SEED) -> dict[str, pd.DataFrame]:
                 continue
             tenure = (d - hire[inv]).days / C.DAYS_PER_MONTH
             minutes = C.PRODUCTIVE_MIN_PER_DAY * C.ramp_factor(tenure) + carry[inv]
-            while minutes > 0 and n_open[0] > 0:
-                q = fifo if rng.random() < C_FIFO else heap
+            while minutes > 0 and n_open > 0:
+                q = fifo if rng.random() < FIFO_PICK_PROB else heap
                 i = heapq.heappop(q)[1]
                 while closed_day[i] is not None:  # lazily skip alerts closed via the other heap
                     i = heapq.heappop(q)[1]
-                n_open[0] -= 1
+                n_open -= 1
                 h = base_handle[i] * speed[inv]
                 handle[i] = h
                 closed_day[i] = d

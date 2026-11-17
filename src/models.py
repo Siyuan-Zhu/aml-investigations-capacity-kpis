@@ -21,7 +21,10 @@ def load_raw(con: duckdb.DuckDBPyConnection, tables: dict[str, pd.DataFrame]) ->
 
 
 def build_ref(con: duckdb.DuckDBPyConnection, as_of: date) -> None:
-    con.execute("CREATE OR REPLACE TABLE run_params AS SELECT CAST(? AS DATE) AS as_of", [as_of])
+    con.execute(
+        "CREATE OR REPLACE TABLE run_params AS SELECT CAST(? AS DATE) AS as_of, CAST(? AS INTEGER) AS sar_clock_days",
+        [as_of, C.SAR_CLOCK_DAYS],
+    )
     con.execute("CREATE OR REPLACE TABLE ref_ramp(tenure_from INTEGER, ramp_factor DOUBLE)")
     con.executemany("INSERT INTO ref_ramp VALUES (?, ?)", C.RAMP)
     con.execute(
